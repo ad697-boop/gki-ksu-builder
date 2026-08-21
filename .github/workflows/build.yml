@@ -62,6 +62,14 @@ jobs:
               fi
             done
           fi
+          if ! git cat-file -e g992742f9cdcc^{commit} 2>/dev/null; then
+            echo "Not found on branches; trying tags..."
+            git fetch --tags --depth=1 https://android.googlesource.com/kernel/common '+refs/tags/*:refs/tags/*' || \
+            git fetch --tags https://android.googlesource.com/kernel/common '+refs/tags/*:refs/tags/*'
+            if git cat-file -e g992742f9cdcc^{commit} 2>/dev/null; then
+              git checkout g992742f9cdcc
+            fi
+          fi
           HEAD=$(git rev-parse HEAD)
           echo "HEAD=$HEAD"
           if [ "${HEAD:0:12}" != "g992742f9cdcc" ]; then
