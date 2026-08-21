@@ -30,6 +30,7 @@ jobs:
           curl -sS https://storage.googleapis.com/git-repo-downloads/repo > "$HOME/bin/repo"
           chmod a+x "$HOME/bin/repo"
           echo "$HOME/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/bin:$PATH"
           repo --version
 
       - name: Sync kernel source (android12-5.10, 2025-12 release)
