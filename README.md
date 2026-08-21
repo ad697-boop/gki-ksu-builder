@@ -1,6 +1,10 @@
 # GKI 5.10 + KernelSU 构建（适配 LMODroid 6.2 / cupid）
 
-用于编译与 ROM 内核完全同源（`5.10.245-gki-g992742f9cdcc`，android12-5.10 分支）并内置 KernelSU 的 GKI 内核。
+用于编译 android12-5.10 分支、内置 KernelSU 的 GKI 内核。
+
+优先尝试与 ROM 内核完全同源的 commit `g992742f9cdcc`；由于该 commit 只在维护者的私有 fork 中、无法公开获取，
+找不到时自动改用官方 2025-12 GKI 发布版（同一 KMI `android12-5.10`、同一安全补丁级别 `2025-12`），
+与 ROM 的 vendor 模块兼容，可正常开机。
 
 ## 使用步骤
 

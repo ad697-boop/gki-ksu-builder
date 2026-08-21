@@ -44,39 +44,24 @@ jobs:
           fi
           repo sync -c -j$(nproc --all) --no-tags --fail-fast
 
-      - name: Pin kernel to ROM commit g992742f9cdcc
+      - name: Pin kernel commit (exact if reachable, else official 2025-12 release)
         run: |
           cd common
-          if git cat-file -e g992742f9cdcc^{commit} 2>/dev/null; then
-            git checkout g992742f9cdcc
-          else
-            echo "Commit not present in shallow clone; fetching branch history..."
-            for branch in android12-5.10 android13-5.10; do
-              echo "Trying branch: $branch"
-              if git fetch --shallow-since=2025-10-01 https://android.googlesource.com/kernel/common "$branch" || \
-                 git fetch --unshallow https://android.googlesource.com/kernel/common "$branch"; then
-                if git cat-file -e g992742f9cdcc^{commit} 2>/dev/null; then
-                  git checkout g992742f9cdcc
-                  break
-                fi
-              fi
-            done
-          fi
+          echo "Manifest revision HEAD: $(git rev-parse HEAD)"
           if ! git cat-file -e g992742f9cdcc^{commit} 2>/dev/null; then
-            echo "Not found on branches; trying tags..."
-            git fetch --tags --depth=1 https://android.googlesource.com/kernel/common '+refs/tags/*:refs/tags/*' || \
-            git fetch --tags https://android.googlesource.com/kernel/common '+refs/tags/*:refs/tags/*'
+            echo "Exact ROM commit not in tree; best-effort fetch (time-based)..."
+            git fetch --shallow-since=2025-10-01 https://android.googlesource.com/kernel/common android12-5.10 2>&1 | tail -n 2 || true
             if git cat-file -e g992742f9cdcc^{commit} 2>/dev/null; then
               git checkout g992742f9cdcc
+              echo "Pinned to exact ROM commit g992742f9cdcc"
+            else
+              echo "Exact commit NOT reachable; building official android12-5.10 2025-12 release (same KMI/SPL) instead"
             fi
+          else
+            git checkout g992742f9cdcc
+            echo "Pinned to exact ROM commit g992742f9cdcc"
           fi
-          HEAD=$(git rev-parse HEAD)
-          echo "HEAD=$HEAD"
-          if [ "${HEAD:0:12}" != "g992742f9cdcc" ]; then
-            echo "ERROR: failed to obtain commit g992742f9cdcc"
-            exit 1
-          fi
-          echo "Pinned commit: $HEAD"
+          echo "Build source HEAD: $(git rev-parse HEAD)"
 
       - name: Integrate KernelSU (built-in)
         run: |
