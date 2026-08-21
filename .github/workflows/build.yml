@@ -53,7 +53,7 @@ jobs:
             echo "Commit not present in shallow clone; fetching branch history..."
             for branch in android12-5.10 android13-5.10; do
               echo "Trying branch: $branch"
-              if git fetch --depth=3000 origin "$branch"; then
+              if git fetch --depth=3000 https://android.googlesource.com/kernel/common "$branch"; then
                 if git cat-file -e g992742f9cdcc^{commit} 2>/dev/null; then
                   git checkout g992742f9cdcc
                   break
