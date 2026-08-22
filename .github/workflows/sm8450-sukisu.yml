@@ -158,7 +158,7 @@ jobs:
           cd "$GITHUB_WORKSPACE/kernel"
           git clone --branch "$KSU_REF" --single-branch "https://github.com/$KSU_REPO" KernelSU
           git -C KernelSU rev-parse --short=8 HEAD
-          ln -s ../../KernelSU/kernel drivers/kernelsu
+          ln -s ../KernelSU/kernel drivers/kernelsu
           grep -q 'kernelsu' drivers/Makefile || printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
           grep -q 'drivers/kernelsu/Kconfig' drivers/Kconfig || printf '\nmenu "KernelSU"\nsource "drivers/kernelsu/Kconfig"\nendmenu\n' >> drivers/Kconfig
           ls -l drivers/kernelsu/Kconfig
