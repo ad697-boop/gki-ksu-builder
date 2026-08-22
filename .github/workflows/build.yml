@@ -75,8 +75,8 @@ jobs:
           # Disable KMI symbol trimming so all exported symbols are kept (like the ROM kernel)
           echo '# CONFIG_TRIM_UNUSED_KSYMS is not set' >> arch/arm64/configs/gki_defconfig
           echo '# CONFIG_UNUSED_KSYMS is not set' >> arch/arm64/configs/gki_defconfig
-          # Force setlocalversion to emit nothing (kills the dirty-tree "+" suffix)
-          sed -i 's|echo "\$res"|echo ""|' scripts/setlocalversion
+          # Force the exact version suffix (also kills the dirty-tree "+" marker)
+          sed -i '$s|echo "\$res"|echo "-gki-g992742f9cdcc"|' scripts/setlocalversion
           grep -n "CONFIG_KSU\|CONFIG_LOCALVERSION\|CONFIG_TRIM_UNUSED_KSYMS" arch/arm64/configs/gki_defconfig
 
       - name: Build kernel
