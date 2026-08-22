@@ -68,7 +68,11 @@ jobs:
           cd common
           curl -LSs https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh | bash -s main
           echo "CONFIG_KSU=y" >> arch/arm64/configs/gki_defconfig
-          grep -n "CONFIG_KSU" arch/arm64/configs/gki_defconfig
+          # Force the exact ROM kernel version string so vendor module vermagic matches
+          sed -i 's/^SUBLEVEL.*/SUBLEVEL = 245/' Makefile
+          echo 'CONFIG_LOCALVERSION="-gki-g992742f9cdcc"' >> arch/arm64/configs/gki_defconfig
+          echo '# CONFIG_LOCALVERSION_AUTO is not set' >> arch/arm64/configs/gki_defconfig
+          grep -n "CONFIG_KSU\|CONFIG_LOCALVERSION" arch/arm64/configs/gki_defconfig
 
       - name: Build kernel
         run: |
@@ -78,6 +82,9 @@ jobs:
           sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' common/build.config.gki.aarch64 || true
           sed -i '/MODULES_ORDER=android\/gki_aarch64_modules/d' common/build.config.gki.aarch64 || true
           sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' common/build.config.gki.aarch64 || true
+          # Match ROM kernel behavior: keep all exported symbols (no KMI trimming)
+          sed -i 's/^TRIM_NONLISTED_KMI=.*/TRIM_NONLISTED_KMI=0/' common/build.config.gki || true
+          sed -i 's/^KMI_ENFORCED=.*/KMI_ENFORCED=0/' common/build.config.gki || true
           LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
           ls -la out/android12-5.10/dist/
 
