@@ -186,7 +186,11 @@ jobs:
 
       - name: Add swap (avoid OOM during kernel build)
         run: |
-          sudo fallocate -l 8G /swapfile
+          set -e
+          # GitHub runner 自带一个正在使用的 /swapfile（fallocate 会报 Text file busy），先停用再重建一个更大的
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192 status=none
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
