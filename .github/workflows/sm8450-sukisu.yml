@@ -12,9 +12,13 @@ on:
         required: false
         default: 'e682ed2de56fd2841ef35741c4d0f03599ffd561'
       ksu_ref:
-        description: 'SukiSU-Ultra 分支（kprobe 方案用 main；非 GKI 内置 LSM 方案用 builtin）'
+        description: 'SukiSU-Ultra 分支/tag（kprobe 方案用 main，稳定版用 v4.1.3）'
         required: false
-        default: 'main'
+        default: 'v4.1.3'
+      ksu_version:
+        description: '强制内核驱动版本号（与管理器一致用 40796；留空则自动）'
+        required: false
+        default: '40796'
 
 permissions:
   contents: read
@@ -30,6 +34,7 @@ jobs:
       KERNEL_REPO: LineageOS/android_kernel_xiaomi_sm8450
       KERNEL_BRANCH: lineage-23.2
       KSU_REPO: SukiSU-Ultra/SukiSU-Ultra
+      KSU_VERSION: ${{ inputs.ksu_version }}
       CLANG_TAR: clang-r563880c.tar.gz
       CLANG_URL: https://github.com/ravindu644/Android-Kernel-Tutorials/releases/download/toolchains/clang-r563880c.tar.gz
       MAGISK_APK_URL: https://github.com/topjohnwu/Magisk/releases/download/v30.7/Magisk-v30.7.apk
@@ -162,6 +167,12 @@ jobs:
           cd "$GITHUB_WORKSPACE/kernel"
           git clone --branch "$KSU_REF" --single-branch "https://github.com/$KSU_REPO" KernelSU
           git -C KernelSU rev-parse --short=8 HEAD
+          # SukiSU 的 KSU_VERSION 默认由 GitHub API 按 main 分支提交数实时计算（与 tag 无关），
+          # 这里按输入强制写死，保证驱动版本 == 管理器版本（如 v4.1.3 -> 40796）
+          if [ -n "$KSU_VERSION" ]; then
+            sed -i "s/^KSU_VERSION[[:space:]]*:=.*$/KSU_VERSION := $KSU_VERSION/" KernelSU/kernel/Kbuild
+            grep -E '^KSU_VERSION' KernelSU/kernel/Kbuild
+          fi
           # builtin 分支在 5.10 上有一个已知类型 bug（USER_ARG_NULL 宏返回指针，但 capture 参数要结构体），做兼容修复；main 分支无此代码，sed 为空操作
           sed -i 's/#define USER_ARG_NULL user_arg_null_ptr()/#define USER_ARG_NULL (*user_arg_null_ptr())/' KernelSU/kernel/sulog/event.c || true
           ln -s ../KernelSU/kernel drivers/kernelsu
