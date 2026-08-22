@@ -205,6 +205,10 @@ jobs:
           set -e -o pipefail
           cd "$GITHUB_WORKSPACE/kernel"
           export PATH="$TOOLCHAIN/bin:$PATH"
+          # 关键：AUTO=n 且内核在 git 仓库里时，setlocalversion 会在 --short 分支输出 "+"（脏树标记），
+          # 导致 vermagic 变成 5.10.256-gki-ge682ed2de56f+，与原厂 vendor 模块（无 +）不匹配。
+          # 设置空的 LOCALVERSION 环境变量即可抑制该 "+"。
+          export LOCALVERSION=""
           make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out -j"$(nproc)" Image 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
           ls -lh out/arch/arm64/boot/Image
 
@@ -221,7 +225,12 @@ jobs:
           cd "$GITHUB_WORKSPACE/kernel"
           echo "=== built Linux version ==="
           strings out/arch/arm64/boot/Image | grep -m1 'Linux version' || true
-          strings out/arch/arm64/boot/Image | grep -m1 "$STOCK_VER" || { echo "VERSION MISMATCH: built kernel != $STOCK_VER"; exit 1; }
+          BUILT_VER=$(strings out/arch/arm64/boot/Image | grep -m1 'SMP preempt mod_unload modversions' | awk '{print $1}')
+          echo "BUILT_VER=$BUILT_VER"
+          if [ "$BUILT_VER" != "$STOCK_VER" ]; then
+            echo "VERSION MISMATCH: built=$BUILT_VER stock=$STOCK_VER"
+            exit 1
+          fi
           bash scripts/extract-ikconfig out/arch/arm64/boot/Image > out/built.config
           grep -E '^CONFIG_KSU=' out/built.config
           echo "=== config diff vs stock (non-fatal, filtered) ==="
