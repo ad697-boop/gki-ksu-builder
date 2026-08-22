@@ -124,8 +124,8 @@ jobs:
           mkdir -p boot_work
           cd boot_work
           # magiskboot 遇到 vbmeta 脚注的 ASN.1 警告时会返回 1，但内核/ramdisk 已正常解出，这里容忍该警告
-          ../magiskboot unpack ../rom_out/boot.img | tee unpack.log || true
-          grep -q 'HEADER_VER' unpack.log
+          ../magiskboot unpack ../rom_out/boot.img 2>&1 | tee unpack.log || true
+          grep -q 'HEADER_VER' unpack.log || { cat unpack.log; exit 1; }
           test -s kernel
           test -s ramdisk.cpio
           ls -lh kernel ramdisk.cpio
@@ -213,8 +213,8 @@ jobs:
           cp new-boot.img "boot-sukiSU-$STOCK_VER.img"
           # verify the repacked image contains our kernel
           rm -f kernel ramdisk.cpio
-          ../magiskboot unpack "boot-sukiSU-$STOCK_VER.img" | tee repack_verify.log || true
-          grep -q 'HEADER_VER' repack_verify.log
+          ../magiskboot unpack "boot-sukiSU-$STOCK_VER.img" 2>&1 | tee repack_verify.log || true
+          grep -q 'HEADER_VER' repack_verify.log || { cat repack_verify.log; exit 1; }
           strings kernel | grep -m1 "$STOCK_VER"
           strings kernel | grep -m1 'KernelSU' || true
 
