@@ -34,7 +34,7 @@ jobs:
       CLANG_URL: https://github.com/ravindu644/Android-Kernel-Tutorials/releases/download/toolchains/clang-r563880c.tar.gz
       MAGISKBOOT_URL: https://raw.githubusercontent.com/jiamils/KernelSU_Action/main/magiskboot
       MAGISKBOOT_SHA256: 4a70c9d92d886ffad3fd72723f9428eec44abe049c3b93a80e7448e85350bb97
-      PAYLOAD_DUMPER_URL: https://github.com/ssut/payload-dumper-go/releases/download/v2.0.2/payload-dumper-go_2.0.2_linux_amd64.tar.gz
+      PAYLOAD_DUMPER_URL: https://github.com/ssut/payload-dumper-go/releases/download/2.0.2/payload-dumper-go_2.0.2_linux_amd64.tar.gz
 
     steps:
       - name: Free disk space
