@@ -23,7 +23,7 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
 2. 默认参数对应 `lineage-23.2-20260820-nightly-cupid-signed`：
    - `rom_url`：ROM 包直链（默认 Princeton 镜像的 20260820 nightly）；
    - `kernel_commit`：内核源码 commit（默认 `e682ed2de56f`，即该 nightly 实际使用的 commit）；
-   - `ksu_ref`：SukiSU 分支（默认 `builtin`，非 GKI 内核用的内置 LSM hook 版本）。
+   - `ksu_ref`：SukiSU 分支（默认 `main`，kprobe hook 方案，与 XDA cupid 内核一致；可选 `builtin`）。
 3. 等构建完成（内核全量 LTO，约 40-90 分钟），下载产物 `boot-sukiSU-5.10.256-gki-ge682ed2de56f`。
 4. 刷入：
    ```bash
@@ -44,8 +44,8 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
 - 从 ROM 包提取原厂 boot.img，解出原厂内核和 ramdisk；
 - 从原厂内核里提取**最终编译配置**（IKCONFIG）作为构建配置，保证与 ROM 完全一致；
 - 解析原厂内核的 vermagic（如 `5.10.256-gki-ge682ed2de56f`），把构建版本字符串设成完全相同的值；
-- 集成 SukiSU-Ultra `builtin` 分支（LSM hook，不需要 kprobes，也不需要改核心 syscall 文件），
-  打开 `CONFIG_KSU=y`（本版暂不开 `KSU_SUSFS`，后续可加）；
+- 集成 SukiSU-Ultra `main` 分支（kprobe hook，本内核 `CONFIG_KPROBES=y` 满足要求），
+  打开 `CONFIG_KSU=y`（本版暂不开 SUSFS，后续可加）；
 - 用与 nightly 相同的 clang（r563880c / clang 21）编译 `Image`；
 - 校验构建内核的版本字符串与原厂一致后，用 magiskboot 换入原厂 boot.img 重打包。
 

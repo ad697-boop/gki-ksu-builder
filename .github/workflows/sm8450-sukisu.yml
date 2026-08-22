@@ -12,9 +12,9 @@ on:
         required: false
         default: 'e682ed2de56fd2841ef35741c4d0f03599ffd561'
       ksu_ref:
-        description: 'SukiSU-Ultra 分支（非 GKI 内核用 builtin）'
+        description: 'SukiSU-Ultra 分支（kprobe 方案用 main；非 GKI 内置 LSM 方案用 builtin）'
         required: false
-        default: 'builtin'
+        default: 'main'
 
 permissions:
   contents: read
@@ -158,6 +158,8 @@ jobs:
           cd "$GITHUB_WORKSPACE/kernel"
           git clone --branch "$KSU_REF" --single-branch "https://github.com/$KSU_REPO" KernelSU
           git -C KernelSU rev-parse --short=8 HEAD
+          # builtin 分支在 5.10 上有一个已知类型 bug（USER_ARG_NULL 宏返回指针，但 capture 参数要结构体），做兼容修复；main 分支无此代码，sed 为空操作
+          sed -i 's/#define USER_ARG_NULL user_arg_null_ptr()/#define USER_ARG_NULL (*user_arg_null_ptr())/' KernelSU/kernel/sulog/event.c || true
           ln -s ../KernelSU/kernel drivers/kernelsu
           grep -q 'kernelsu' drivers/Makefile || printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
           grep -q 'drivers/kernelsu/Kconfig' drivers/Kconfig || printf '\nmenu "KernelSU"\nsource "drivers/kernelsu/Kconfig"\nendmenu\n' >> drivers/Kconfig
@@ -181,11 +183,18 @@ jobs:
 
       - name: Build kernel (Image)
         run: |
-          set -e
+          set -e -o pipefail
           cd "$GITHUB_WORKSPACE/kernel"
           export PATH="$TOOLCHAIN/bin:$PATH"
-          make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out -j"$(nproc)" Image
+          make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out -j"$(nproc)" Image 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
           ls -lh out/arch/arm64/boot/Image
+
+      - name: Upload build log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: ${{ github.workspace }}/build.log
 
       - name: Verify kernel version and config
         run: |
