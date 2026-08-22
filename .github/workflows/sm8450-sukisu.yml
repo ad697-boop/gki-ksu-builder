@@ -234,14 +234,16 @@ jobs:
           set -e -o pipefail
           cd "$GITHUB_WORKSPACE"
           git clone --depth=1 https://github.com/myflavor/ReKernel-X rekernel_x
-          mkdir -p lkm_src
-          cp -r rekernel_x/LKM-Source/* lkm_src/
           cd kernel
+          # LKM 源码里的 #include "../android/binder_internal.h" 是相对路径，
+          # 必须放在内核树 drivers/rekernel_x 下编译（官方 README 的要求）
+          mkdir -p drivers/rekernel_x
+          cp -r "$GITHUB_WORKSPACE/rekernel_x/LKM-Source/"* drivers/rekernel_x/
           export PATH="$TOOLCHAIN/bin:$PATH"
           export LOCALVERSION=""
-          make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out M="$GITHUB_WORKSPACE/lkm_src" RKX_VERSION="v1.5" modules 2>&1 | tee "$GITHUB_WORKSPACE/lkm_build.log"
-          ls -lh "$GITHUB_WORKSPACE/lkm_src"/rekernel_x.ko
-          MOD_VER=$(strings "$GITHUB_WORKSPACE/lkm_src"/rekernel_x.ko | grep -m1 'SMP preempt mod_unload modversions' | awk '{print $1}')
+          make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out M="$GITHUB_WORKSPACE/kernel/drivers/rekernel_x" RKX_VERSION="v1.5" modules 2>&1 | tee "$GITHUB_WORKSPACE/lkm_build.log"
+          ls -lh "$GITHUB_WORKSPACE/kernel/drivers/rekernel_x"/rekernel_x.ko
+          MOD_VER=$(strings "$GITHUB_WORKSPACE/kernel/drivers/rekernel_x"/rekernel_x.ko | grep -m1 'SMP preempt mod_unload modversions' | awk '{print $1}')
           MOD_VER=${MOD_VER#vermagic=}
           echo "LKM vermagic: $MOD_VER"
           if [ "$MOD_VER" != "$STOCK_VER" ]; then
@@ -259,7 +261,7 @@ jobs:
           unzip -qo rekernel_x_official.zip -d module_tpl
           rm -rf module_tpl/kmod
           mkdir -p module_tpl/kmod
-          cp lkm_src/rekernel_x.ko "module_tpl/kmod/rekernel_x-android12-5.10-20260823.ko"
+          cp "$GITHUB_WORKSPACE/kernel/drivers/rekernel_x/rekernel_x.ko" "module_tpl/kmod/rekernel_x-android12-5.10-20260823.ko"
           sed -i 's/^version=.*/version=1.5-cupid/' module_tpl/module.prop
           sed -i 's/^versionCode=.*/versionCode=7/' module_tpl/module.prop
           (cd module_tpl && zip -qr "$GITHUB_WORKSPACE/ReKernel-X-1.5-cupid-5.10.256.zip" .)
@@ -335,4 +337,4 @@ jobs:
             ${{ github.workspace }}/boot_work/stock.config
             ${{ github.workspace }}/kernel/out/built.config
             ${{ github.workspace }}/ReKernel-X-1.5-cupid-5.10.256.zip
-            ${{ github.workspace }}/lkm_src/rekernel_x.ko
+            ${{ github.workspace }}/kernel/drivers/rekernel_x/rekernel_x.ko
