@@ -127,6 +127,8 @@ jobs:
           cd boot_work
           # magiskboot 遇到 vbmeta 脚注的 ASN.1 警告时会返回 1，但内核/ramdisk 已正常解出，这里容忍该警告
           ../magiskboot unpack ../rom_out/boot.img 2>&1 | tee unpack.log || true
+          # 原厂 boot.img 复制到工作目录，供后面 repack 使用
+          cp ../rom_out/boot.img boot.img
           grep -q 'HEADER_VER' unpack.log || { cat unpack.log; exit 1; }
           test -s kernel
           test -s ramdisk.cpio
