@@ -123,7 +123,8 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           mkdir -p boot_work
           cd boot_work
-          ../magiskboot unpack ../rom_out/boot.img | tee unpack.log
+          # magiskboot 遇到 vbmeta 脚注的 ASN.1 警告时会返回 1，但内核/ramdisk 已正常解出，这里容忍该警告
+          ../magiskboot unpack ../rom_out/boot.img | tee unpack.log || true
           grep -q 'HEADER_VER' unpack.log
           test -s kernel
           test -s ramdisk.cpio
@@ -206,12 +207,13 @@ jobs:
           set -e
           cd "$GITHUB_WORKSPACE/boot_work"
           cp "$GITHUB_WORKSPACE/kernel/out/arch/arm64/boot/Image" kernel
-          ../magiskboot repack boot.img
+          ../magiskboot repack boot.img || true
+          test -s new-boot.img
           ls -lh new-boot.img
           cp new-boot.img "boot-sukiSU-$STOCK_VER.img"
           # verify the repacked image contains our kernel
           rm -f kernel ramdisk.cpio
-          ../magiskboot unpack "boot-sukiSU-$STOCK_VER.img" | tee repack_verify.log
+          ../magiskboot unpack "boot-sukiSU-$STOCK_VER.img" | tee repack_verify.log || true
           grep -q 'HEADER_VER' repack_verify.log
           strings kernel | grep -m1 "$STOCK_VER"
           strings kernel | grep -m1 'KernelSU' || true
