@@ -25,6 +25,8 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
    - `kernel_commit`：内核源码 commit（默认 `e682ed2de56f`，即该 nightly 实际使用的 commit）；
    - `ksu_ref`：SukiSU 分支/tag（默认 `v4.1.3` 稳定版；`main` 为最新开发版）。
    - `ksu_version`：强制内核驱动版本号（默认 `40796`，与 v4.1.3 管理器一致；留空则按 SukiSU 源码自动计算）。
+   - `build_rekernel_x`：默认 `yes`，同时编译 ReKernel-X 内核模块（墓碑模块内核支持）并打包成
+     匹配本内核的模块 zip（官方预编译 .ko 的 vermagic 与本机不匹配，刷入无效，必须重新编译）。
 3. 等构建完成（内核全量 LTO，约 40-90 分钟），下载产物 `boot-sukiSU-5.10.256-gki-ge682ed2de56f`。
 4. 刷入：
    ```bash
@@ -39,6 +41,8 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
 - `Image`：编译出的原始内核（备用，可自己用 magiskboot 换进别的 boot.img）；
 - `stock.config` / `built.config`：原厂内核配置 / 本次构建配置，用于核对差异；
 - `boot.img`：原厂 boot 镜像（备份）。
+- `ReKernel-X-1.5-cupid-5.10.256.zip`：重新编译的 ReKernel-X 模块（vermagic 与本内核一致），
+  用 SukiSU 管理器刷入后重启即可生效。
 
 ## 工作原理
 

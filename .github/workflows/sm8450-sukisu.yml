@@ -19,6 +19,10 @@ on:
         description: '强制内核驱动版本号（与管理器一致用 40796；留空则自动）'
         required: false
         default: '40796'
+      build_rekernel_x:
+        description: '同时编译 ReKernel-X LKM 并打包成模块（墓碑模块内核支持）'
+        required: false
+        default: 'yes'
 
 permissions:
   contents: read
@@ -35,6 +39,7 @@ jobs:
       KERNEL_BRANCH: lineage-23.2
       KSU_REPO: SukiSU-Ultra/SukiSU-Ultra
       KSU_VERSION: ${{ inputs.ksu_version }}
+      BUILD_REKERNEL_X: ${{ inputs.build_rekernel_x }}
       CLANG_TAR: clang-r563880c.tar.gz
       CLANG_URL: https://github.com/ravindu644/Android-Kernel-Tutorials/releases/download/toolchains/clang-r563880c.tar.gz
       MAGISK_APK_URL: https://github.com/topjohnwu/Magisk/releases/download/v30.7/Magisk-v30.7.apk
@@ -223,6 +228,43 @@ jobs:
           make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out -j"$(nproc)" Image 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
           ls -lh out/arch/arm64/boot/Image
 
+      - name: Build ReKernel-X LKM (matching this kernel)
+        if: env.BUILD_REKERNEL_X == 'yes'
+        run: |
+          set -e -o pipefail
+          cd "$GITHUB_WORKSPACE"
+          git clone --depth=1 https://github.com/myflavor/ReKernel-X rekernel_x
+          mkdir -p lkm_src
+          cp -r rekernel_x/LKM-Source/* lkm_src/
+          cd kernel
+          export PATH="$TOOLCHAIN/bin:$PATH"
+          export LOCALVERSION=""
+          make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out M="$GITHUB_WORKSPACE/lkm_src" RKX_VERSION="v1.5" modules 2>&1 | tee "$GITHUB_WORKSPACE/lkm_build.log"
+          ls -lh "$GITHUB_WORKSPACE/lkm_src"/rekernel_x.ko
+          MOD_VER=$(strings "$GITHUB_WORKSPACE/lkm_src"/rekernel_x.ko | grep -m1 'SMP preempt mod_unload modversions' | awk '{print $1}')
+          MOD_VER=${MOD_VER#vermagic=}
+          echo "LKM vermagic: $MOD_VER"
+          if [ "$MOD_VER" != "$STOCK_VER" ]; then
+            echo "LKM VERMAGIC MISMATCH: $MOD_VER != $STOCK_VER"
+            exit 1
+          fi
+
+      - name: Package ReKernel-X module zip
+        if: env.BUILD_REKERNEL_X == 'yes'
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          curl -fL --retry 5 -o rekernel_x_official.zip "https://github.com/myflavor/ReKernel-X/releases/download/1.5/ReKernel-X-1.5.zip"
+          mkdir -p module_tpl
+          unzip -qo rekernel_x_official.zip -d module_tpl
+          rm -rf module_tpl/kmod
+          mkdir -p module_tpl/kmod
+          cp lkm_src/rekernel_x.ko "module_tpl/kmod/rekernel_x-android12-5.10-20260823.ko"
+          sed -i 's/^version=.*/version=1.5-cupid/' module_tpl/module.prop
+          sed -i 's/^versionCode=.*/versionCode=7/' module_tpl/module.prop
+          (cd module_tpl && zip -qr "$GITHUB_WORKSPACE/ReKernel-X-1.5-cupid-5.10.256.zip" .)
+          ls -lh "$GITHUB_WORKSPACE/ReKernel-X-1.5-cupid-5.10.256.zip"
+
       - name: Upload build log (on failure)
         if: always()
         uses: actions/upload-artifact@v4
@@ -292,3 +334,5 @@ jobs:
             ${{ github.workspace }}/rom_out/boot.img
             ${{ github.workspace }}/boot_work/stock.config
             ${{ github.workspace }}/kernel/out/built.config
+            ${{ github.workspace }}/ReKernel-X-1.5-cupid-5.10.256.zip
+            ${{ github.workspace }}/lkm_src/rekernel_x.ko
