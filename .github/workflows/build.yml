@@ -72,7 +72,12 @@ jobs:
           sed -i 's/^SUBLEVEL.*/SUBLEVEL = 245/' Makefile
           echo 'CONFIG_LOCALVERSION="-gki-g992742f9cdcc"' >> arch/arm64/configs/gki_defconfig
           echo '# CONFIG_LOCALVERSION_AUTO is not set' >> arch/arm64/configs/gki_defconfig
-          grep -n "CONFIG_KSU\|CONFIG_LOCALVERSION" arch/arm64/configs/gki_defconfig
+          # Disable KMI symbol trimming so all exported symbols are kept (like the ROM kernel)
+          echo '# CONFIG_TRIM_UNUSED_KSYMS is not set' >> arch/arm64/configs/gki_defconfig
+          echo '# CONFIG_UNUSED_KSYMS is not set' >> arch/arm64/configs/gki_defconfig
+          # Force setlocalversion to emit nothing (kills the dirty-tree "+" suffix)
+          sed -i 's|echo "\$res"|echo ""|' scripts/setlocalversion
+          grep -n "CONFIG_KSU\|CONFIG_LOCALVERSION\|CONFIG_TRIM_UNUSED_KSYMS" arch/arm64/configs/gki_defconfig
 
       - name: Build kernel
         run: |
@@ -83,8 +88,11 @@ jobs:
           sed -i '/MODULES_ORDER=android\/gki_aarch64_modules/d' common/build.config.gki.aarch64 || true
           sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' common/build.config.gki.aarch64 || true
           # Match ROM kernel behavior: keep all exported symbols (no KMI trimming)
-          sed -i 's/^TRIM_NONLISTED_KMI=.*/TRIM_NONLISTED_KMI=0/' common/build.config.gki || true
-          sed -i 's/^KMI_ENFORCED=.*/KMI_ENFORCED=0/' common/build.config.gki || true
+          for f in common/build.config.gki common/build.config.gki.aarch64 common/build.config.common; do
+            if [ -f "$f" ]; then
+              sed -i -e 's/^TRIM_NONLISTED_KMI=.*/TRIM_NONLISTED_KMI=0/' -e 's/^KMI_ENFORCED=.*/KMI_ENFORCED=0/' "$f"
+            fi
+          done
           LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
           ls -la out/android12-5.10/dist/
 
