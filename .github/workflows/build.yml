@@ -78,7 +78,7 @@ jobs:
           sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' common/build.config.gki.aarch64 || true
           sed -i '/MODULES_ORDER=android\/gki_aarch64_modules/d' common/build.config.gki.aarch64 || true
           sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' common/build.config.gki.aarch64 || true
-          BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
+          LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
           ls -la out/android12-5.10/dist/
 
       - name: Verify kernel version string
