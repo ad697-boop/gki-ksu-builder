@@ -1,0 +1,240 @@
+name: Build SukiSU kernel (SM8450 lineage-23.2 / cupid)
+
+on:
+  workflow_dispatch:
+    inputs:
+      rom_url:
+        description: 'ROM 包直链（从里面提取原厂 boot.img）'
+        required: false
+        default: 'https://mirror.math.princeton.edu/pub/lineageos/full/cupid/20260820/lineage-23.2-20260820-nightly-cupid-signed.zip'
+      kernel_commit:
+        description: '内核源码 commit（LineageOS/android_kernel_xiaomi_sm8450 lineage-23.2）'
+        required: false
+        default: 'e682ed2de56fd2841ef35741c4d0f03599ffd561'
+      ksu_ref:
+        description: 'SukiSU-Ultra 分支（非 GKI 内核用 builtin）'
+        required: false
+        default: 'builtin'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      ROM_URL: ${{ inputs.rom_url }}
+      KERNEL_COMMIT: ${{ inputs.kernel_commit }}
+      KSU_REF: ${{ inputs.ksu_ref }}
+      KERNEL_REPO: LineageOS/android_kernel_xiaomi_sm8450
+      KERNEL_BRANCH: lineage-23.2
+      KSU_REPO: SukiSU-Ultra/SukiSU-Ultra
+      CLANG_TAR: clang-r563880c.tar.gz
+      CLANG_URL: https://github.com/ravindu644/Android-Kernel-Tutorials/releases/download/toolchains/clang-r563880c.tar.gz
+      MAGISKBOOT_URL: https://raw.githubusercontent.com/jiamils/KernelSU_Action/main/magiskboot
+      MAGISKBOOT_SHA256: 4a70c9d92d886ffad3fd72723f9428eec44abe049c3b93a80e7448e85350bb97
+      PAYLOAD_DUMPER_URL: https://github.com/xishang0128/payload-dumper-go/releases/download/v0.1.6/payload-dumper-linux-amd64-v3.tar.gz
+
+    steps:
+      - name: Free disk space
+        uses: AdityaGarg8/remove-unwanted-software@v5
+        with:
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+          remove-large-packages: 'true'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git curl wget xz-utils zstd cpio lz4 pkg-config bc bison flex libssl-dev libelf-dev ccache zip unzip python3 file
+
+      - name: Download clang toolchain (clang-r563880c, same as nightly build)
+        run: |
+          set -e
+          mkdir -p "$HOME/toolchain"
+          cd "$HOME/toolchain"
+          curl -fL --retry 5 -o "$CLANG_TAR" "$CLANG_URL"
+          tar -xf "$CLANG_TAR"
+          rm -f "$CLANG_TAR"
+          if [ -x bin/clang ]; then
+            TC="$HOME/toolchain"
+          else
+            BIN_DIR=$(find "$HOME/toolchain" -type f -path '*/bin/clang' | head -1 | xargs dirname)
+            TC=$(dirname "$BIN_DIR")
+          fi
+          echo "TOOLCHAIN=$TC" >> "$GITHUB_ENV"
+          echo "$TC/bin" >> "$GITHUB_PATH"
+          clang --version | head -1
+
+      - name: Download magiskboot (Linux)
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          curl -fL --retry 5 -o magiskboot "$MAGISKBOOT_URL"
+          echo "$MAGISKBOOT_SHA256  magiskboot" | sha256sum -c -
+          chmod +x magiskboot
+          file magiskboot
+          strings magiskboot | grep -m1 'MagiskBoot'
+
+      - name: Download payload-dumper-go (Linux)
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          curl -fL --retry 5 -o pdg.tar.gz "$PAYLOAD_DUMPER_URL"
+          mkdir -p pdg
+          tar -xf pdg.tar.gz -C pdg
+          PAYLOAD_BIN=$(find pdg -maxdepth 2 -type f -name 'payload-dumper*' | head -1)
+          chmod +x "$PAYLOAD_BIN"
+          file "$PAYLOAD_BIN"
+          echo "PAYLOAD_BIN=$PAYLOAD_BIN" >> "$GITHUB_ENV"
+
+      - name: Download ROM zip
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          curl -fL --retry 5 -o rom.zip "$ROM_URL"
+          ls -lh rom.zip
+
+      - name: Extract boot.img from ROM payload
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          "$PAYLOAD_BIN" -partitions boot -o rom_out rom.zip
+          ls -lh rom_out/
+
+      - name: Clone kernel source (LineageOS SM8450 @ pinned commit)
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          git clone --depth=1 --branch "$KERNEL_BRANCH" "https://github.com/$KERNEL_REPO" kernel
+          cd kernel
+          git fetch --depth=1 origin "$KERNEL_COMMIT"
+          git checkout "$KERNEL_COMMIT"
+          echo "Kernel source HEAD: $(git rev-parse HEAD)"
+          grep -E '^(VERSION|PATCHLEVEL|SUBLEVEL) = ' Makefile
+
+      - name: Unpack stock boot.img
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p boot_work
+          cd boot_work
+          ../magiskboot unpack ../rom_out/boot.img | tee unpack.log
+          grep -q 'HEADER_VER' unpack.log
+          test -s kernel
+          test -s ramdisk.cpio
+          ls -lh kernel ramdisk.cpio
+
+      - name: Extract stock kernel version and exact kernel config
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE/kernel"
+          VERMAGIC=$(strings ../boot_work/kernel | grep -m1 'SMP preempt mod_unload modversions' || true)
+          if [ -z "$VERMAGIC" ]; then
+            echo "Failed to find vermagic in stock kernel"; exit 1
+          fi
+          STOCK_VER=$(echo "$VERMAGIC" | awk '{print $1}')
+          echo "STOCK_VER=$STOCK_VER"
+          echo "STOCK_VER=$STOCK_VER" >> "$GITHUB_ENV"
+          KBASE=$(awk '/^VERSION/{v=$3} /^PATCHLEVEL/{p=$3} /^SUBLEVEL/{s=$3} END{print v"."p"."s}' Makefile)
+          SUFFIX=${STOCK_VER#"$KBASE"}
+          if [ -z "$SUFFIX" ]; then
+            echo "Failed to compute version suffix (base=$KBASE ver=$STOCK_VER)"; exit 1
+          fi
+          echo "KBASE=$KBASE SUFFIX=$SUFFIX"
+          echo "SUFFIX=$SUFFIX" >> "$GITHUB_ENV"
+          bash scripts/extract-ikconfig ../boot_work/kernel > ../boot_work/stock.config
+          wc -l ../boot_work/stock.config
+          grep -E '^CONFIG_LOCALVERSION' ../boot_work/stock.config || true
+
+      - name: Integrate SukiSU Ultra (${{ env.KSU_REF }})
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE/kernel"
+          git clone --branch "$KSU_REF" --single-branch "https://github.com/$KSU_REPO" KernelSU
+          git -C KernelSU rev-parse --short=8 HEAD
+          ln -s ../../KernelSU/kernel drivers/kernelsu
+          grep -q 'kernelsu' drivers/Makefile || printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
+          grep -q 'drivers/kernelsu/Kconfig' drivers/Kconfig || printf '\nmenu "KernelSU"\nsource "drivers/kernelsu/Kconfig"\nendmenu\n' >> drivers/Kconfig
+          ls -l drivers/kernelsu/Kconfig
+          tail -n 6 drivers/Kconfig
+
+      - name: Prepare kernel config (stock config + KSU, exact version string)
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE/kernel"
+          mkdir -p out
+          cp "$GITHUB_WORKSPACE/boot_work/stock.config" out/.config
+          scripts/config --file out/.config --set-str CONFIG_LOCALVERSION "$SUFFIX"
+          scripts/config --file out/.config --disable CONFIG_LOCALVERSION_AUTO
+          scripts/config --file out/.config --enable KSU
+          scripts/config --file out/.config --disable KSU_SUSFS
+          grep -E 'CONFIG_LOCALVERSION|^CONFIG_KSU' out/.config || true
+          export PATH="$TOOLCHAIN/bin:$PATH"
+          make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out olddefconfig
+          grep -E '^CONFIG_KSU=|^CONFIG_LOCALVERSION|^CONFIG_LOCALVERSION_AUTO' out/.config
+
+      - name: Build kernel (Image)
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE/kernel"
+          export PATH="$TOOLCHAIN/bin:$PATH"
+          make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out -j"$(nproc)" Image
+          ls -lh out/arch/arm64/boot/Image
+
+      - name: Verify kernel version and config
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE/kernel"
+          echo "=== built Linux version ==="
+          strings out/arch/arm64/boot/Image | grep -m1 'Linux version' || true
+          strings out/arch/arm64/boot/Image | grep -m1 "$STOCK_VER" || { echo "VERSION MISMATCH: built kernel != $STOCK_VER"; exit 1; }
+          bash scripts/extract-ikconfig out/arch/arm64/boot/Image > out/built.config
+          grep -E '^CONFIG_KSU=' out/built.config
+          echo "=== config diff vs stock (non-fatal, filtered) ==="
+          diff -u "$GITHUB_WORKSPACE/boot_work/stock.config" out/built.config \
+            | grep -E '^[+-](CONFIG_|# CONFIG_)' \
+            | grep -viE 'KSU|LOCALVERSION|IKCONFIG|CC_VERSION|GCC_VERSION|TRIM_UNUSED|MODULE_SCMVERSION' \
+            | head -60 || true
+
+      - name: Repack boot.img with KSU kernel
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE/boot_work"
+          cp "$GITHUB_WORKSPACE/kernel/out/arch/arm64/boot/Image" kernel
+          ../magiskboot repack boot.img
+          ls -lh new-boot.img
+          cp new-boot.img "boot-sukiSU-$STOCK_VER.img"
+          # verify the repacked image contains our kernel
+          rm -f kernel ramdisk.cpio
+          ../magiskboot unpack "boot-sukiSU-$STOCK_VER.img" | tee repack_verify.log
+          grep -q 'HEADER_VER' repack_verify.log
+          strings kernel | grep -m1 "$STOCK_VER"
+          strings kernel | grep -m1 'KernelSU' || true
+
+      - name: Summary
+        run: |
+          echo "=================================================="
+          echo "构建完成：boot-sukiSU-$STOCK_VER.img"
+          echo ""
+          echo "刷入方法（先备份原 boot）:"
+          echo "  fastboot flash boot boot-sukiSU-$STOCK_VER.img"
+          echo "  fastboot reboot"
+          echo ""
+          echo "备用：内核原始 Image 也在产物里，可用 magiskboot 自行换入其它 ROM 的 boot.img"
+          echo "=================================================="
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-sukiSU-${{ env.STOCK_VER }}
+          path: |
+            ${{ github.workspace }}/boot_work/boot-sukiSU-${{ env.STOCK_VER }}.img
+            ${{ github.workspace }}/kernel/out/arch/arm64/boot/Image
+            ${{ github.workspace }}/rom_out/boot.img
+            ${{ github.workspace }}/boot_work/stock.config
+            ${{ github.workspace }}/kernel/out/built.config
