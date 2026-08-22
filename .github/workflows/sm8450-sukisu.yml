@@ -176,10 +176,21 @@ jobs:
           scripts/config --file out/.config --disable CONFIG_LOCALVERSION_AUTO
           scripts/config --file out/.config --enable KSU
           scripts/config --file out/.config --disable KSU_SUSFS
+          # full LTO 在 2 核/7GB 的 runner 上会 OOM（exit 143），改用内存占用小得多的 thin LTO，不影响 vermagic/模块兼容
+          scripts/config --file out/.config --disable LTO_CLANG_FULL
+          scripts/config --file out/.config --enable LTO_CLANG_THIN
           grep -E 'CONFIG_LOCALVERSION|^CONFIG_KSU' out/.config || true
           export PATH="$TOOLCHAIN/bin:$PATH"
           make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out olddefconfig
-          grep -E '^CONFIG_KSU=|^CONFIG_LOCALVERSION|^CONFIG_LOCALVERSION_AUTO' out/.config
+          grep -E '^CONFIG_KSU=|^CONFIG_LOCALVERSION|^CONFIG_LOCALVERSION_AUTO|^CONFIG_LTO' out/.config
+
+      - name: Add swap (avoid OOM during kernel build)
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
 
       - name: Build kernel (Image)
         run: |
@@ -190,7 +201,7 @@ jobs:
           ls -lh out/arch/arm64/boot/Image
 
       - name: Upload build log (on failure)
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-log
