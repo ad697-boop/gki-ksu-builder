@@ -27,10 +27,6 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
    - `ksu_version`：强制内核驱动版本号（默认 `40796`，与 v4.1.3 管理器一致；留空则按 SukiSU 源码自动计算）。
    - `build_rekernel_x`：默认 `yes`，同时编译 ReKernel-X 内核模块（墓碑模块内核支持）并打包成
      匹配本内核的模块 zip（官方预编译 .ko 的 vermagic 与本机不匹配，刷入无效，必须重新编译）。
-   - `build_mode`：默认 `rom`（从 ROM 包提取配置并打包 boot）；选 `config` 则用仓库内
-     已保存的内核配置构建（`configs/evox-cupid-5.10.247.config`），不需要 ROM 直链，
-     产物为内核 Image + ReKernel-X 模块，boot 镜像需用 magiskboot 本地重打包。
-   - `kernel_version`：`config` 模式下指定内核版本字符串（如 `5.10.247-gki-ge2219bb2bb17`）。
    - `susfs`：默认 `no`；选 `yes` 时自动使用 SukiSU `builtin` 分支（LSM hook，自带 SUSFS 驱动代码），
      并从 susfs4ksu 的 `gki-android12-5.10` 分支打 SUSFS 内核补丁、开启 `CONFIG_KSU_SUSFS`。
 3. 等构建完成（内核全量 LTO，约 40-90 分钟），下载产物 `boot-sukiSU-5.10.256-gki-ge682ed2de56f`。
@@ -69,17 +65,6 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
   `uname -r` / vermagic 里看到 `-g<12位commit>`）；
 
 就能编出匹配该 ROM 的 KSU 内核。GKI 内核（6.1/6.6）的设备请勿使用本 workflow。
-
-### EvolutionX 16.0（cupid，5.10.247）示例
-
-Run workflow 时设置：
-
-- `build_mode = config`
-- `kernel_commit = e2219bb2bb17c371779cba71b8501c069c266fbe`
-- `kernel_version = 5.10.247-gki-ge2219bb2bb17`
-
-其余用默认值。产物里下载 `Image` 和 `ReKernel-X-*.zip`，boot 镜像用本地 magiskboot 重打包
-（解包原厂 boot → 替换 kernel → repack）。
 
 ## 注意
 
