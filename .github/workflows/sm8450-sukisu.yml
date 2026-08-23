@@ -23,6 +23,22 @@ on:
         description: '同时编译 ReKernel-X LKM 并打包成模块（墓碑模块内核支持）'
         required: false
         default: 'yes'
+      build_mode:
+        description: 'rom=从 ROM 包提取配置并打包 boot；config=用仓库内配置构建（内核+模块，boot 本地重打包）'
+        required: false
+        default: 'rom'
+      kernel_version:
+        description: 'config 模式用的内核版本字符串（如 5.10.247-gki-ge2219bb2bb17）'
+        required: false
+        default: ''
+      stock_config:
+        description: 'config 模式用的内核配置文件（仓库内路径）'
+        required: false
+        default: 'configs/evox-cupid-5.10.247.config'
+      kernel_branch:
+        description: '内核源码分支'
+        required: false
+        default: 'lineage-23.2'
 
 permissions:
   contents: read
@@ -36,10 +52,13 @@ jobs:
       KERNEL_COMMIT: ${{ inputs.kernel_commit }}
       KSU_REF: ${{ inputs.ksu_ref }}
       KERNEL_REPO: LineageOS/android_kernel_xiaomi_sm8450
-      KERNEL_BRANCH: lineage-23.2
+      KERNEL_BRANCH: ${{ inputs.kernel_branch }}
       KSU_REPO: SukiSU-Ultra/SukiSU-Ultra
       KSU_VERSION: ${{ inputs.ksu_version }}
       BUILD_REKERNEL_X: ${{ inputs.build_rekernel_x }}
+      BUILD_MODE: ${{ inputs.build_mode }}
+      KERNEL_VERSION: ${{ inputs.kernel_version }}
+      STOCK_CONFIG: ${{ inputs.stock_config }}
       CLANG_TAR: clang-r563880c.tar.gz
       CLANG_URL: https://github.com/ravindu644/Android-Kernel-Tutorials/releases/download/toolchains/clang-r563880c.tar.gz
       MAGISK_APK_URL: https://github.com/topjohnwu/Magisk/releases/download/v30.7/Magisk-v30.7.apk
@@ -105,6 +124,7 @@ jobs:
           echo "PAYLOAD_BIN=$PAYLOAD_BIN" >> "$GITHUB_ENV"
 
       - name: Download ROM zip
+        if: env.BUILD_MODE == 'rom'
         run: |
           set -e
           cd "$GITHUB_WORKSPACE"
@@ -112,6 +132,7 @@ jobs:
           ls -lh rom.zip
 
       - name: Extract boot.img from ROM payload
+        if: env.BUILD_MODE == 'rom'
         run: |
           set -e
           cd "$GITHUB_WORKSPACE"
@@ -130,6 +151,7 @@ jobs:
           grep -E '^(VERSION|PATCHLEVEL|SUBLEVEL) = ' Makefile
 
       - name: Unpack stock boot.img
+        if: env.BUILD_MODE == 'rom'
         run: |
           set -e
           cd "$GITHUB_WORKSPACE"
@@ -148,13 +170,26 @@ jobs:
         run: |
           set -e
           cd "$GITHUB_WORKSPACE/kernel"
-          VERMAGIC=$(strings ../boot_work/kernel | grep -m1 'SMP preempt mod_unload modversions' || true)
-          if [ -z "$VERMAGIC" ]; then
-            echo "Failed to find vermagic in stock kernel"; exit 1
+          if [ "$BUILD_MODE" = "config" ]; then
+            # config 模式：直接用仓库里的内核配置 + 手动指定的版本字符串，不依赖 ROM 包
+            STOCK_VER="$KERNEL_VERSION"
+            if [ -z "$STOCK_VER" ]; then
+              echo "config 模式需要提供 kernel_version 输入"; exit 1
+            fi
+            mkdir -p "$GITHUB_WORKSPACE/boot_work"
+            cp "$GITHUB_WORKSPACE/$STOCK_CONFIG" "$GITHUB_WORKSPACE/boot_work/stock.config"
+            echo "STOCK_VER=$STOCK_VER"
+            echo "STOCK_VER=$STOCK_VER" >> "$GITHUB_ENV"
+          else
+            VERMAGIC=$(strings ../boot_work/kernel | grep -m1 'SMP preempt mod_unload modversions' || true)
+            if [ -z "$VERMAGIC" ]; then
+              echo "Failed to find vermagic in stock kernel"; exit 1
+            fi
+            STOCK_VER=$(echo "$VERMAGIC" | awk '{print $1}')
+            echo "STOCK_VER=$STOCK_VER"
+            echo "STOCK_VER=$STOCK_VER" >> "$GITHUB_ENV"
+            bash scripts/extract-ikconfig ../boot_work/kernel > ../boot_work/stock.config
           fi
-          STOCK_VER=$(echo "$VERMAGIC" | awk '{print $1}')
-          echo "STOCK_VER=$STOCK_VER"
-          echo "STOCK_VER=$STOCK_VER" >> "$GITHUB_ENV"
           KBASE=$(awk '/^VERSION/{v=$3} /^PATCHLEVEL/{p=$3} /^SUBLEVEL/{s=$3} END{print v"."p"."s}' Makefile)
           SUFFIX=${STOCK_VER#"$KBASE"}
           if [ -z "$SUFFIX" ]; then
@@ -162,7 +197,6 @@ jobs:
           fi
           echo "KBASE=$KBASE SUFFIX=$SUFFIX"
           echo "SUFFIX=$SUFFIX" >> "$GITHUB_ENV"
-          bash scripts/extract-ikconfig ../boot_work/kernel > ../boot_work/stock.config
           wc -l ../boot_work/stock.config
           grep -E '^CONFIG_LOCALVERSION' ../boot_work/stock.config || true
 
@@ -304,6 +338,7 @@ jobs:
             | head -60 || true
 
       - name: Repack boot.img with KSU kernel
+        if: env.BUILD_MODE == 'rom'
         run: |
           set -e
           cd "$GITHUB_WORKSPACE/boot_work"
