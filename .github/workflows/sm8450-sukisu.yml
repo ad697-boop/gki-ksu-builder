@@ -1,12 +1,21 @@
-name: Build SukiSU kernel (SM8450 lineage-23.2 / cupid)
+name: Build SukiSU kernel (SM8450 cupid / lineage-23.2 & AviumUI)
 
 on:
   workflow_dispatch:
     inputs:
-      rom_url:
-        description: 'ROM 包直链（从里面提取原厂 boot.img）'
+      rom_preset:
+        description: 'ROM 预设：lineage-23.2 / aviumui-16.2.1 / custom（自定义时在 rom_url 里填直链）'
         required: false
-        default: 'https://mirror.math.princeton.edu/pub/lineageos/full/cupid/20260820/lineage-23.2-20260820-nightly-cupid-signed.zip'
+        default: 'lineage-23.2'
+        type: choice
+        options:
+          - lineage-23.2
+          - aviumui-16.2.1
+          - custom
+      rom_url:
+        description: '自定义 ROM 包直链（仅 rom_preset=custom 时生效；预设会自动覆盖）'
+        required: false
+        default: ''
       kernel_commit:
         description: '内核源码 commit（LineageOS/android_kernel_xiaomi_sm8450 lineage-23.2）'
         required: false
@@ -41,6 +50,7 @@ jobs:
     timeout-minutes: 240
     env:
       ROM_URL: ${{ inputs.rom_url }}
+      ROM_PRESET: ${{ inputs.rom_preset }}
       KERNEL_COMMIT: ${{ inputs.kernel_commit }}
       KSU_REF: ${{ inputs.ksu_ref }}
       KERNEL_REPO: LineageOS/android_kernel_xiaomi_sm8450
@@ -113,6 +123,33 @@ jobs:
           chmod +x "$PAYLOAD_BIN"
           file "$PAYLOAD_BIN"
           echo "PAYLOAD_BIN=$PAYLOAD_BIN" >> "$GITHUB_ENV"
+
+      - name: Resolve ROM preset
+        run: |
+          set -e
+          case "$ROM_PRESET" in
+            lineage-23.2)
+              RESOLVED_URL="https://mirror.math.princeton.edu/pub/lineageos/full/cupid/20260820/lineage-23.2-20260820-nightly-cupid-signed.zip"
+              ;;
+            aviumui-16.2.1)
+              # 官方 SourceForge 直链（AviumUI 官网下载页 cupid 条目，2026-07-16 版）
+              RESOLVED_URL="https://sourceforge.net/projects/aviumui-official/files/cupid/16.2/GMS/AviumUI-16.2.1-cupid-20260716-Official-GMS.zip/download"
+              ;;
+            custom)
+              RESOLVED_URL="$ROM_URL"
+              ;;
+            *)
+              echo "Unknown ROM_PRESET: $ROM_PRESET"; exit 1
+              ;;
+          esac
+          if [ -z "$RESOLVED_URL" ]; then
+            echo "ERROR: rom_preset=custom 时必须填写 rom_url"
+            exit 1
+          fi
+          echo "ROM_URL=$RESOLVED_URL" >> "$GITHUB_ENV"
+          echo "ROM_LABEL=$ROM_PRESET" >> "$GITHUB_ENV"
+          echo "Using ROM preset: $ROM_PRESET"
+          echo "ROM_URL: $RESOLVED_URL"
 
       - name: Download ROM zip
         run: |
@@ -359,10 +396,10 @@ jobs:
             exit 1
           fi
           ls -lh new-boot.img
-          cp new-boot.img "boot-sukiSU-$STOCK_VER.img"
+          cp new-boot.img "boot-sukiSU-$ROM_LABEL-$STOCK_VER.img"
           # verify the repacked image contains our kernel
           rm -f kernel ramdisk.cpio
-          ../magiskboot unpack "boot-sukiSU-$STOCK_VER.img" 2>&1 | tee repack_verify.log || true
+          ../magiskboot unpack "boot-sukiSU-$ROM_LABEL-$STOCK_VER.img" 2>&1 | tee repack_verify.log || true
           grep -q 'HEADER_VER' repack_verify.log || { cat repack_verify.log; exit 1; }
           strings kernel | grep -m1 "$STOCK_VER"
           strings kernel | grep -m1 'KernelSU' || true
@@ -370,10 +407,11 @@ jobs:
       - name: Summary
         run: |
           echo "=================================================="
-          echo "构建完成：boot-sukiSU-$STOCK_VER.img"
+          echo "ROM: $ROM_PRESET（AviumUI/LineageOS 均用同一内核 e682ed2de56f）"
+          echo "构建完成：boot-sukiSU-$ROM_PRESET-$STOCK_VER.img"
           echo ""
           echo "刷入方法（先备份原 boot）:"
-          echo "  fastboot flash boot boot-sukiSU-$STOCK_VER.img"
+          echo "  fastboot flash boot boot-sukiSU-$ROM_PRESET-$STOCK_VER.img"
           echo "  fastboot reboot"
           echo ""
           echo "备用：内核原始 Image 也在产物里，可用 magiskboot 自行换入其它 ROM 的 boot.img"
@@ -382,9 +420,9 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: boot-sukiSU-${{ env.STOCK_VER }}
+          name: boot-sukiSU-${{ env.ROM_LABEL }}-${{ env.STOCK_VER }}
           path: |
-            ${{ github.workspace }}/boot_work/boot-sukiSU-${{ env.STOCK_VER }}.img
+            ${{ github.workspace }}/boot_work/boot-sukiSU-${{ env.ROM_LABEL }}-${{ env.STOCK_VER }}.img
             ${{ github.workspace }}/kernel/out/arch/arm64/boot/Image
             ${{ github.workspace }}/rom_out/boot.img
             ${{ github.workspace }}/boot_work/stock.config

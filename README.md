@@ -1,7 +1,7 @@
-# SukiSU 内核构建（Xiaomi 12 / cupid，SM8450，LineageOS 23.2）
+# SukiSU 内核构建（Xiaomi 12 / cupid，SM8450，LineageOS 23.2 / AviumUI 16.2.1）
 
 在 GitHub Actions 上，用 **LineageOS 官方 SM8450 内核源码**（`LineageOS/android_kernel_xiaomi_sm8450`，
-`lineage-23.2` 分支）编译内置 **SukiSU Ultra** 的内核，并直接用原厂 boot.img 重打包成可刷入的 boot 镜像。
+`lineage-23.2` 分支）编译内置 **SukiSU Ultra** 的内核，并直接用所选 ROM 的原厂 boot.img 重打包成可刷入的 boot 镜像。
 
 > 给接手者的完整说明（推荐先读）：[AGENTS.md](AGENTS.md)
 >
@@ -28,9 +28,14 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
 
 ## 使用步骤
 
-1. 进入仓库 Actions 页，手动运行 **Build SukiSU kernel (SM8450 lineage-23.2 / cupid)**。
-2. 默认参数对应 `lineage-23.2-20260820-nightly-cupid-signed`：
-   - `rom_url`：ROM 包直链（默认 Princeton 镜像的 20260820 nightly）；
+1. 进入仓库 Actions 页，手动运行 **Build SukiSU kernel (SM8450 cupid / lineage-23.2 & AviumUI)**。
+2. 选择 ROM 预设 `rom_preset`：
+   - `lineage-23.2`（默认）：`lineage-23.2-20260820-nightly-cupid-signed`（Princeton 镜像）；
+   - `aviumui-16.2.1`：`AviumUI-16.2.1-cupid-20260716-Official-GMS.zip`（官方 SourceForge 直链）；
+   - `custom`：自己填 `rom_url` 直链（同一内核的其它类原生 ROM 也可用）。
+   两个预设共用一个内核 commit（`e682ed2de56f`），构建内核配置从各自 boot.img 提取，完全匹配各自的 ramdisk。
+   其它参数：
+   - `rom_url`：仅 `rom_preset=custom` 时生效（预设会自动覆盖该值）；
    - `kernel_commit`：内核源码 commit（默认 `e682ed2de56f`，即该 nightly 实际使用的 commit）；
    - `ksu_ref`：SukiSU 分支/tag（默认 `v4.1.3` 稳定版；`main` 为最新开发版）。
    - `ksu_version`：强制内核驱动版本号（默认 `40796`，与 v4.1.3 管理器一致；留空则按 SukiSU 源码自动计算）。
@@ -38,10 +43,11 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
      匹配本内核的模块 zip（官方预编译 .ko 的 vermagic 与本机不匹配，刷入无效，必须重新编译）。
    - `susfs`：默认 `no`；选 `yes` 时自动使用 SukiSU `builtin` 分支（LSM hook，自带 SUSFS 驱动代码），
      并从 susfs4ksu 的 `gki-android12-5.10` 分支打 SUSFS 内核补丁、开启 `CONFIG_KSU_SUSFS`。
-3. 等构建完成（内核全量 LTO，约 40-90 分钟），下载产物 `boot-sukiSU-5.10.256-gki-ge682ed2de56f`。
+3. 等构建完成（内核 thin LTO + 8G swap，约 40-90 分钟），下载产物
+   `boot-sukiSU-<rom预设>-5.10.256-gki-ge682ed2de56f`（如 `boot-sukiSU-aviumui-16.2.1-...`）。
 4. 刷入：
    ```bash
-   fastboot flash boot boot-sukiSU-5.10.256-gki-ge682ed2de56f.img
+   fastboot flash boot boot-sukiSU-<rom预设>-5.10.256-gki-ge682ed2de56f.img
    fastboot reboot
    ```
    然后安装 [SukiSU Manager](https://github.com/SukiSU-Ultra/SukiSU-Ultra/releases)。
@@ -67,9 +73,9 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
 
 ## 其它 ROM 怎么用
 
-其它基于同一内核（`android_kernel_xiaomi_sm8450`）的类原生 ROM，只要：
+其它基于同一内核（`android_kernel_xiaomi_sm8450`）的类原生 ROM（如 EvolutionX、LMODroid），只要：
 
-- 把 `rom_url` 换成对应 ROM 包的直链；
+- `rom_preset` 选 `custom`，把 `rom_url` 换成对应 ROM 包的直链；
 - 把 `kernel_commit` 换成该 ROM 实际使用的内核 commit（可在 ROM 内核的
   `uname -r` / vermagic 里看到 `-g<12位commit>`）；
 
