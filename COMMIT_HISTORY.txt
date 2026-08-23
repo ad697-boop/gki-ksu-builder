@@ -1,3 +1,5 @@
+fe577af fix: SUSFS 构建固定 builtin@6c13a069（KSU_APP_PROFILE_VER=3，匹配 v4.1.3 管理器，修复 app profile 更新失败）
+2479f30 docs: 增加 AGENTS.md 与完整文档（供其它 AI 接手），不推送
 f9b7ad1 fix: 删除过期的 builtin USER_ARG_NULL sed 补丁（上游已修复，旧补丁反而改坏）
 a0f6d7b revert: 只保留 lineage-23.2，移除 EvolutionX config 模式与配置文件
 f06328a feat: 增加 susfs 开关（builtin 分支 + susfs4ksu 5.10 内核补丁 + CONFIG_KSU_SUSFS）
