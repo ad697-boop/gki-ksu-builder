@@ -3,6 +3,15 @@
 在 GitHub Actions 上，用 **LineageOS 官方 SM8450 内核源码**（`LineageOS/android_kernel_xiaomi_sm8450`，
 `lineage-23.2` 分支）编译内置 **SukiSU Ultra** 的内核，并直接用原厂 boot.img 重打包成可刷入的 boot 镜像。
 
+> 给接手者的完整说明（推荐先读）：[AGENTS.md](AGENTS.md)
+>
+> 文档目录：
+> - [00-背景与根因](docs/00-背景与根因.md)：为什么这台设备不能刷 GKI / 不能 LKM 修补
+> - [01-构建流程](docs/01-构建流程.md)：workflow 逐步骤说明
+> - [02-踩坑记录](docs/02-踩坑记录.md)：所有已修复的问题
+> - [03-术语表](docs/03-术语表.md)：vermagic / KMI / SUSFS 等术语
+> - [04-本地工作区与恢复](docs/04-本地工作区与恢复.md)：本机文件、刷机与恢复
+
 ## 为什么这么做（背景）
 
 cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS 内核**，不是真正的 GKI 内核。
