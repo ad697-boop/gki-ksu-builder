@@ -204,8 +204,6 @@ jobs:
             test -f fs/susfs.c && echo "fs/susfs.c OK"
             test -f include/linux/susfs.h && echo "include/linux/susfs.h OK"
           fi
-          # builtin 分支在 5.10 上有一个已知类型 bug（USER_ARG_NULL 宏返回指针，但 capture 参数要结构体），做兼容修复；main 分支无此代码，sed 为空操作
-          sed -i 's/#define USER_ARG_NULL user_arg_null_ptr()/#define USER_ARG_NULL (*user_arg_null_ptr())/' KernelSU/kernel/sulog/event.c || true
           ln -s ../KernelSU/kernel drivers/kernelsu
           grep -q 'kernelsu' drivers/Makefile || printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
           grep -q 'drivers/kernelsu/Kconfig' drivers/Kconfig || printf '\nmenu "KernelSU"\nsource "drivers/kernelsu/Kconfig"\nendmenu\n' >> drivers/Kconfig
