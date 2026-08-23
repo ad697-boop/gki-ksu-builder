@@ -39,6 +39,10 @@ on:
         description: '内核源码分支'
         required: false
         default: 'lineage-23.2'
+      susfs:
+        description: '是否开启 SUSFS（root 隐藏；yes 时自动使用 SukiSU builtin 分支并打 susfs 内核补丁）'
+        required: false
+        default: 'no'
 
 permissions:
   contents: read
@@ -59,6 +63,7 @@ jobs:
       BUILD_MODE: ${{ inputs.build_mode }}
       KERNEL_VERSION: ${{ inputs.kernel_version }}
       STOCK_CONFIG: ${{ inputs.stock_config }}
+      SUSFS: ${{ inputs.susfs }}
       CLANG_TAR: clang-r563880c.tar.gz
       CLANG_URL: https://github.com/ravindu644/Android-Kernel-Tutorials/releases/download/toolchains/clang-r563880c.tar.gz
       MAGISK_APK_URL: https://github.com/topjohnwu/Magisk/releases/download/v30.7/Magisk-v30.7.apk
@@ -204,13 +209,34 @@ jobs:
         run: |
           set -e
           cd "$GITHUB_WORKSPACE/kernel"
-          git clone --branch "$KSU_REF" --single-branch "https://github.com/$KSU_REPO" KernelSU
+          EFFECTIVE_REF="$KSU_REF"
+          if [ "$SUSFS" = "yes" ]; then
+            # SUSFS 驱动代码集成在 SukiSU 的 builtin 分支（LSM hook 方案）
+            EFFECTIVE_REF=builtin
+            echo "SUSFS=yes，SukiSU 分支强制使用 builtin"
+          fi
+          git clone --branch "$EFFECTIVE_REF" --single-branch "https://github.com/$KSU_REPO" KernelSU
           git -C KernelSU rev-parse --short=8 HEAD
           # SukiSU 的 KSU_VERSION 默认由 GitHub API 按 main 分支提交数实时计算（与 tag 无关），
           # 这里按输入强制写死，保证驱动版本 == 管理器版本（如 v4.1.3 -> 40796）
           if [ -n "$KSU_VERSION" ]; then
-            sed -i "s/^KSU_VERSION[[:space:]]*:=.*$/KSU_VERSION := $KSU_VERSION/" KernelSU/kernel/Kbuild
-            grep -E '^KSU_VERSION' KernelSU/kernel/Kbuild
+            sed -i "s/^KSU_VERSION[[:space:]]*:=.*$/KSU_VERSION := $KSU_VERSION/" KernelSU/kernel/Kbuild 2>/dev/null || true
+            sed -i "s/^KSU_VERSION[[:space:]]*:=.*$/KSU_VERSION := $KSU_VERSION/" KernelSU/kernel/Makefile 2>/dev/null || true
+            grep -E '^KSU_VERSION' KernelSU/kernel/Kbuild KernelSU/kernel/Makefile 2>/dev/null || true
+          fi
+          if [ "$SUSFS" = "yes" ]; then
+            # susfs4ksu 内核侧补丁（gki-android12-5.10，即 5.10 补丁集）
+            cd "$GITHUB_WORKSPACE"
+            git clone --depth=1 --branch gki-android12-5.10 https://gitlab.com/simonpunk/susfs4ksu.git susfs4ksu
+            cd kernel
+            cp "$GITHUB_WORKSPACE/susfs4ksu/kernel_patches/fs/"* fs/
+            cp "$GITHUB_WORKSPACE/susfs4ksu/kernel_patches/include/linux/"* include/linux/
+            patch -p1 < "$GITHUB_WORKSPACE/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android12-5.10.patch" 2>&1 | tee "$GITHUB_WORKSPACE/susfs_patch.log" || {
+              echo "===== SUSFS 内核补丁冲突，日志见 susfs_patch.log ====="
+              exit 1
+            }
+            test -f fs/susfs.c && echo "fs/susfs.c OK"
+            test -f include/linux/susfs.h && echo "include/linux/susfs.h OK"
           fi
           # builtin 分支在 5.10 上有一个已知类型 bug（USER_ARG_NULL 宏返回指针，但 capture 参数要结构体），做兼容修复；main 分支无此代码，sed 为空操作
           sed -i 's/#define USER_ARG_NULL user_arg_null_ptr()/#define USER_ARG_NULL (*user_arg_null_ptr())/' KernelSU/kernel/sulog/event.c || true
@@ -229,14 +255,19 @@ jobs:
           scripts/config --file out/.config --set-str CONFIG_LOCALVERSION "$SUFFIX"
           scripts/config --file out/.config --disable CONFIG_LOCALVERSION_AUTO
           scripts/config --file out/.config --enable KSU
-          scripts/config --file out/.config --disable KSU_SUSFS
+          if [ "$SUSFS" = "yes" ]; then
+            scripts/config --file out/.config --enable KSU_SUSFS
+            echo "SUSFS enabled"
+          else
+            scripts/config --file out/.config --disable KSU_SUSFS
+          fi
           # full LTO 在 2 核/7GB 的 runner 上会 OOM（exit 143），改用内存占用小得多的 thin LTO，不影响 vermagic/模块兼容
           scripts/config --file out/.config --disable LTO_CLANG_FULL
           scripts/config --file out/.config --enable LTO_CLANG_THIN
           grep -E 'CONFIG_LOCALVERSION|^CONFIG_KSU' out/.config || true
           export PATH="$TOOLCHAIN/bin:$PATH"
           make ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 O=out olddefconfig
-          grep -E '^CONFIG_KSU=|^CONFIG_LOCALVERSION|^CONFIG_LOCALVERSION_AUTO|^CONFIG_LTO' out/.config
+          grep -E '^CONFIG_KSU=|^CONFIG_KSU_SUSFS|^CONFIG_LOCALVERSION|^CONFIG_LOCALVERSION_AUTO|^CONFIG_LTO' out/.config
 
       - name: Add swap (avoid OOM during kernel build)
         run: |
@@ -316,6 +347,7 @@ jobs:
           path: |
             ${{ github.workspace }}/build.log
             ${{ github.workspace }}/lkm_build.log
+            ${{ github.workspace }}/susfs_patch.log
 
       - name: Verify kernel version and config
         run: |

@@ -31,6 +31,8 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
      已保存的内核配置构建（`configs/evox-cupid-5.10.247.config`），不需要 ROM 直链，
      产物为内核 Image + ReKernel-X 模块，boot 镜像需用 magiskboot 本地重打包。
    - `kernel_version`：`config` 模式下指定内核版本字符串（如 `5.10.247-gki-ge2219bb2bb17`）。
+   - `susfs`：默认 `no`；选 `yes` 时自动使用 SukiSU `builtin` 分支（LSM hook，自带 SUSFS 驱动代码），
+     并从 susfs4ksu 的 `gki-android12-5.10` 分支打 SUSFS 内核补丁、开启 `CONFIG_KSU_SUSFS`。
 3. 等构建完成（内核全量 LTO，约 40-90 分钟），下载产物 `boot-sukiSU-5.10.256-gki-ge682ed2de56f`。
 4. 刷入：
    ```bash
