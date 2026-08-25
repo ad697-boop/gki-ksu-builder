@@ -1,4 +1,4 @@
-# SukiSU 内核构建（Xiaomi 12 / cupid，SM8450，LineageOS 23.2 / AviumUI 16.2.1）
+# SukiSU 内核构建（Xiaomi 12 / cupid，SM8450，LineageOS / AviumUI / DerpFest）
 
 在 GitHub Actions 上，用 **LineageOS 官方 SM8450 内核源码**（`LineageOS/android_kernel_xiaomi_sm8450`，
 `lineage-23.2` 分支）编译内置 **SukiSU Ultra** 的内核，并直接用所选 ROM 的原厂 boot.img 重打包成可刷入的 boot 镜像。
@@ -32,6 +32,8 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
 2. 选择 ROM 预设 `rom_preset`：
    - `lineage-23.2`（默认）：`lineage-23.2-20260820-nightly-cupid-signed`（Princeton 镜像）；
    - `aviumui-16.2.1`：`AviumUI-16.2.1-cupid-20260716-Official-GMS.zip`（官方 SourceForge 直链）；
+   - `derpfest-16.2`：`DerpFest-v16.2-20260723-cupid-Official-Stable`（官方托管 OneDrive 无匿名直链，
+     直接使用仓库内 `stock_boot/derpfest-16.2/boot.img.gz`，无需外链；也可手动填 `rom_url` 覆盖）；
    - `custom`：自己填 `rom_url` 直链（同一内核的其它类原生 ROM 也可用）。
    两个预设共用一个内核 commit（`e682ed2de56f`），构建内核配置从各自 boot.img 提取，完全匹配各自的 ramdisk。
    其它参数：

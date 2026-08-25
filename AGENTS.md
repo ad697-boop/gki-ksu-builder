@@ -13,9 +13,11 @@
 ## 快速开始
 
 1. 仓库 Actions 页手动运行 **Build SukiSU kernel (SM8450 cupid / lineage-23.2 & AviumUI)**。
-2. 选择 `rom_preset`（lineage-23.2 / aviumui-16.2.1 / custom）：
+2. 选择 `rom_preset`（lineage-23.2 / aviumui-16.2.1 / derpfest-16.2 / custom）：
    - `lineage-23.2`（默认）：`lineage-23.2-20260820-nightly-cupid-signed`
    - `aviumui-16.2.1`：`AviumUI-16.2.1-cupid-20260716-Official-GMS.zip`（官方 SourceForge 直链）
+   - `derpfest-16.2`：`DerpFest-v16.2-20260723-cupid-Official-Stable`（仓库内 stock_boot boot.img.gz，
+     无需外链；填 `rom_url` 可改走完整 ROM 下载）
    - `custom`：自己填 `rom_url`（同一内核的其它 ROM 也可用）
    其它参数：
    - `rom_url`：仅 custom 时生效（预设会覆盖它）

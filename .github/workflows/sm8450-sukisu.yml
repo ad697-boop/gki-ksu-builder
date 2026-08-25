@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       rom_preset:
-        description: 'ROM 预设：lineage-23.2 / aviumui-16.2.1 / custom（自定义时在 rom_url 里填直链）'
+        description: 'ROM 预设：lineage-23.2 / aviumui-16.2.1 / derpfest-16.2 / custom（DerpFest 默认用仓库内 stock_boot，无需外链；custom 时在 rom_url 里填直链）'
         required: false
         default: 'lineage-23.2'
         type: choice
         options:
           - lineage-23.2
           - aviumui-16.2.1
+          - derpfest-16.2
           - custom
       rom_url:
         description: '自定义 ROM 包直链（仅 rom_preset=custom 时生效；预设会自动覆盖）'
@@ -67,6 +68,9 @@ jobs:
       PAYLOAD_DUMPER_URL: https://github.com/ssut/payload-dumper-go/releases/download/2.0.2/payload-dumper-go_2.0.2_linux_amd64.tar.gz
 
     steps:
+      - name: Checkout repository (stock_boot for DerpFest)
+        uses: actions/checkout@v4
+
       - name: Free disk space
         uses: AdityaGarg8/remove-unwanted-software@v5
         with:
@@ -135,6 +139,11 @@ jobs:
               # 官方 SourceForge 直链（AviumUI 官网下载页 cupid 条目，2026-07-16 版）
               RESOLVED_URL="https://sourceforge.net/projects/aviumui-official/files/cupid/16.2/GMS/AviumUI-16.2.1-cupid-20260716-Official-GMS.zip/download"
               ;;
+            derpfest-16.2)
+              # DerpFest cupid 官方托管 OneDrive，无稳定匿名直链；默认直接用仓库内 stock_boot/derpfest-16.2/boot.img.gz
+              # （原厂 boot 已提取并压缩，21.9MB）。若手动填了 rom_url，则改为从该 URL 下载完整 ROM。
+              RESOLVED_URL="$ROM_URL"
+              ;;
             custom)
               RESOLVED_URL="$ROM_URL"
               ;;
@@ -142,16 +151,32 @@ jobs:
               echo "Unknown ROM_PRESET: $ROM_PRESET"; exit 1
               ;;
           esac
-          if [ -z "$RESOLVED_URL" ]; then
-            echo "ERROR: rom_preset=custom 时必须填写 rom_url"
+          if [ -z "$RESOLVED_URL" ] && [ "$ROM_PRESET" != "derpfest-16.2" ]; then
+            echo "ERROR: rom_preset=$ROM_PRESET 时必须填写 rom_url（DerpFest 可留空走仓库 stock_boot）"
             exit 1
           fi
-          echo "ROM_URL=$RESOLVED_URL" >> "$GITHUB_ENV"
+          if [ -n "$RESOLVED_URL" ]; then
+            echo "ROM_URL=$RESOLVED_URL" >> "$GITHUB_ENV"
+          fi
           echo "ROM_LABEL=$ROM_PRESET" >> "$GITHUB_ENV"
           echo "Using ROM preset: $ROM_PRESET"
-          echo "ROM_URL: $RESOLVED_URL"
+          if [ -n "$RESOLVED_URL" ]; then
+            echo "ROM_URL: $RESOLVED_URL"
+          else
+            echo "ROM_URL: (使用仓库内 stock_boot/derpfest-16.2/boot.img.gz)"
+          fi
+
+      - name: Prepare boot.img from repo (DerpFest stock_boot)
+        if: env.ROM_PRESET == 'derpfest-16.2' && env.ROM_URL == ''
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p rom_out
+          gunzip -c stock_boot/derpfest-16.2/boot.img.gz > rom_out/boot.img
+          ls -lh rom_out/boot.img
 
       - name: Download ROM zip
+        if: env.ROM_PRESET != 'derpfest-16.2' || env.ROM_URL != ''
         run: |
           set -e
           cd "$GITHUB_WORKSPACE"
@@ -159,6 +184,7 @@ jobs:
           ls -lh rom.zip
 
       - name: Extract boot.img from ROM payload
+        if: env.ROM_PRESET != 'derpfest-16.2' || env.ROM_URL != ''
         run: |
           set -e
           cd "$GITHUB_WORKSPACE"
