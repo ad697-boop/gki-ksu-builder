@@ -1,3 +1,4 @@
+eaafbf5 feat: 新增 DerpFest-16.2 cupid 预设（仓库内 stock_boot boot.img.gz，免 ROM 直链）
 a47859d docs: 本地状态更新至 AviumUI-16.2.1（已刷入验证成功）
 339e806 docs: 补记 c62bbcf
 c62bbcf docs: 记录 AviumUI 预设 commit（5796380）
