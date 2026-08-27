@@ -1,3 +1,5 @@
+a8d8133 docs: 精简全部 Markdown 说明（README/AGENTS/docs，总量减半，保留核心结论与操作要点）
+1bba76c docs: 补记 0610f75
 0610f75 refactor: 删除无效的旧 GKI build.yml；workflow 输入改为 ROM+配置预设两个下拉框（preset 自动填充技术参数）
 fd26346 docs: 补记 1ab5819
 1ab5819 feat: 新增 ReSukiSU 支持（root_impl=resuki，非 GKI 自动 Manual/SUSFS Inline 钩子，不强制版本号）
