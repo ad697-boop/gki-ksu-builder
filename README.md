@@ -1,101 +1,48 @@
-# SukiSU 内核构建（Xiaomi 12 / cupid，SM8450，LineageOS / AviumUI / DerpFest）
+# SukiSU/ReSukiSU 内核构建（Xiaomi 12 cupid）
 
-在 GitHub Actions 上，用 **LineageOS 官方 SM8450 内核源码**（`LineageOS/android_kernel_xiaomi_sm8450`，
-`lineage-23.2` 分支）编译内置 **SukiSU Ultra** 的内核，并直接用所选 ROM 的原厂 boot.img 重打包成可刷入的 boot 镜像。
+在 GitHub Actions 上，用 ROM 同源的 LineageOS SM8450 内核源码编译内置 SukiSU/ReSukiSU 的内核，
+用原厂 boot.img 重打包成可刷入的 boot 镜像。支持 LineageOS / AviumUI / DerpFest。
 
-> 给接手者的完整说明（推荐先读）：[AGENTS.md](AGENTS.md)
->
-> 文档目录：
-> - [00-背景与根因](docs/00-背景与根因.md)：为什么这台设备不能刷 GKI / 不能 LKM 修补
-> - [01-构建流程](docs/01-构建流程.md)：workflow 逐步骤说明
-> - [02-踩坑记录](docs/02-踩坑记录.md)：所有已修复的问题
-> - [03-术语表](docs/03-术语表.md)：vermagic / KMI / SUSFS 等术语
-> - [04-本地工作区与恢复](docs/04-本地工作区与恢复.md)：本机文件、刷机与恢复
+> 接手者必读：[AGENTS.md](AGENTS.md)；细节见 docs/01 构建流程、02 踩坑记录、03 术语表、04 本地状态。
 
-## 为什么这么做（背景）
+## 为什么不能刷 GKI（先读）
 
-cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS 内核**，不是真正的 GKI 内核。
-版本号里的 `5.10.256-gki-ge682ed2de56f` 是伪装出来的：
+cupid 的类原生 ROM 用的都是**高通 OSS 内核**，版本号 `5.10.256-gki-ge682ed2de56f` 里的 `gki-`
+只是 `CONFIG_LOCALVERSION` 伪装，为了让 vendor 模块过 vermagic 校验。真 GKI 内核（官方/ShirkNeko/自编）
+刷入**必无限重启**；管理器 LKM 修补也不生效（vermagic + modversions CRC 过不了）。
+唯一可行：把 SukiSU **编译进这颗高通内核**，版本字符串与原厂完全一致。
 
-- 内核本身是高通 SM8450 内核（`ARCH_WAIPIO/CAPE/DIWALI` 等），不是 Google common 内核；
-- `-gki-` 只是 `CONFIG_LOCALVERSION`，为了让 vendor_boot 里的 54 个预编译模块能通过 vermagic 校验加载；
-- 所以任何“通用 GKI 内核”（官方 KSU、ShirkNeko、以及本仓库旧的 GKI workflow 产物）刷进去都会无限重启；
-- 管理器“修补 boot.img”的 LKM 方式也不会生效：通用 ksu 模块过不了这颗内核的
-  vermagic + `CONFIG_MODVERSIONS` 符号校验。
+## 使用（Actions 页手动运行）
 
-正确做法就是把 SukiSU **编译进这颗高通内核本身**，并保持与 ROM 完全一致的版本字符串
-（`5.10.256-gki-ge682ed2de56f`），这样原厂 vendor 模块照样加载，root 也生效。
+只需选两个下拉框：
 
-## 使用步骤
+1. **`rom_preset`**（ROM）：`lineage-23.2` / `aviumui-16.2.1` / `derpfest-16.2` / `custom`
+   - DerpFest 用仓库内 `stock_boot`，无需外链；`custom` 需填 `rom_url` 直链
+2. **`preset`**（配置）：`suki-susfs`（推荐）/ `suki-stable` / `resuki-susfs` / `custom`
+   - 预设自动填充 root_impl / ksu_ref / ksu_version / susfs / ksu_commit / ReKernel-X 等参数
+   - 其它参数仅 `preset=custom` 时手动，平时不动
 
-1. 进入仓库 Actions 页，手动运行 **Build SukiSU/ReSukiSU kernel (Xiaomi 12 cupid)**。
-2. 只需选两个下拉框：
-   - **① `rom_preset`**（选 ROM）：
-   - `lineage-23.2`（默认）：`lineage-23.2-20260820-nightly-cupid-signed`（Princeton 镜像）；
-   - `aviumui-16.2.1`：`AviumUI-16.2.1-cupid-20260716-Official-GMS.zip`（官方 SourceForge 直链）；
-   - `derpfest-16.2`：`DerpFest-v16.2-20260723-cupid-Official-Stable`（官方托管 OneDrive 无匿名直链，
-     直接使用仓库内 `stock_boot/derpfest-16.2/boot.img.gz`，无需外链；也可手动填 `rom_url` 覆盖）；
-   - `custom`：自己填 `rom_url` 直链（同一内核的其它类原生 ROM 也可用）。
-   - **② `preset`**（选配置，自动填充技术参数）：
-     - `suki-susfs`（默认，推荐）：SukiSU v4.1.3 + SUSFS 全开 + 驱动 40796 + ReKernel-X；
-     - `suki-stable`：SukiSU v4.1.3 基础版（无 SUSFS）；
-     - `resuki-susfs`：ReSukiSU main + SUSFS（多管理器兼容，版本号自动）；
-     - `custom`：高级，手动配置下面所有参数。
-3. 两个 ROM 预设共用一个内核 commit（`e682ed2de56f`），构建内核配置从各自 boot.img 提取，完全匹配各自的 ramdisk。
-   以下参数平时不用动，仅 `preset=custom` 时才需要理解：
-   - `rom_url`：仅 `rom_preset=custom` 时生效（预设会自动覆盖该值）；
-   - `root_impl`：Root 实现，默认 `sukisu`（SukiSU-Ultra）；选 `resuki` 用 ReSukiSU
-     （SukiSU-Ultra 的稳定分支，多管理器兼容，构建更容易）。
-     ReSukiSU 模式：`susfs=yes` 时自动选 SUSFS Inline Hook + susfs4ksu 内核补丁；
-     `susfs=no` 时选 Manual Hook（非 GKI 用，Tracepoint 只支持 GKI2）。
-     ReSukiSU 版本号用它自带的公式（30000+commits+700），不强制 ksu_version。
-   - `kernel_commit`：内核源码 commit（默认 `e682ed2de56f`，即该 nightly 实际使用的 commit）；
-   - `ksu_ref`：SukiSU 分支/tag（默认 `v4.1.3` 稳定版；`main` 为最新开发版）。
-   - `ksu_version`：强制内核驱动版本号（默认 `40796`，与 v4.1.3 管理器一致；留空则按 SukiSU 源码自动计算）。
-   - `build_rekernel_x`：默认 `yes`，同时编译 ReKernel-X 内核模块（墓碑模块内核支持）并打包成
-     匹配本内核的模块 zip（官方预编译 .ko 的 vermagic 与本机不匹配，刷入无效，必须重新编译）。
-   - `susfs`：默认 `no`；选 `yes` 时自动使用 SukiSU `builtin` 分支（LSM hook，自带 SUSFS 驱动代码），
-     并从 susfs4ksu 的 `gki-android12-5.10` 分支打 SUSFS 内核补丁、开启 `CONFIG_KSU_SUSFS`。
-4. 等构建完成（内核 thin LTO + 8G swap，约 40-90 分钟），下载产物
-   `boot-sukiSU-<rom预设>-5.10.256-gki-ge682ed2de56f`（如 `boot-sukiSU-aviumui-16.2.1-...`）。
-5. 刷入：
-   ```bash
-   fastboot flash boot boot-sukiSU-<rom预设>-5.10.256-gki-ge682ed2de56f.img
-   fastboot reboot
-   ```
-   然后安装 [SukiSU Manager](https://github.com/SukiSU-Ultra/SukiSU-Ultra/releases)。
+构建约 40-90 分钟，产物 `boot-sukiSU-<rom>-5.10.256-gki-ge682ed2de56f.img`：
 
-## 产物说明
+```bash
+fastboot flash boot boot-sukiSU-<rom>-5.10.256-gki-ge682ed2de56f.img
+fastboot reboot
+```
 
-- `boot-sukiSU-<版本>.img`：直接刷入 `boot` 分区的成品镜像（只换了内核，ramdisk/header 与原厂一致）；
-- `Image`：编译出的原始内核（备用，可自己用 magiskboot 换进别的 boot.img）；
-- `stock.config` / `built.config`：原厂内核配置 / 本次构建配置，用于核对差异；
-- `boot.img`：原厂 boot 镜像（备份）。
-- `ReKernel-X-1.5-cupid-5.10.256.zip`：重新编译的 ReKernel-X 模块（vermagic 与本内核一致），
-  用 SukiSU 管理器刷入后重启即可生效。
+## 产物
 
-## 工作原理
+- `boot-sukiSU-<rom>-*.img`：成品（只换内核，ramdisk/header 保持原厂）
+- `Image`：原始内核（备用）
+- `rom_out/boot.img`：原厂 boot 备份
+- `stock.config` / `built.config`：原厂/构建配置对照
+- `ReKernel-X-*.zip` + `rekernel_x.ko`：墓碑支持模块（必须重新编译，官方 ko vermagic 不匹配）
 
-- 从 ROM 包提取原厂 boot.img，解出原厂内核和 ramdisk；
-- 从原厂内核里提取**最终编译配置**（IKCONFIG）作为构建配置，保证与 ROM 完全一致；
-- 解析原厂内核的 vermagic（如 `5.10.256-gki-ge682ed2de56f`），把构建版本字符串设成完全相同的值；
-- 集成 SukiSU-Ultra（默认 pin 到 `v4.1.3` tag 并把驱动版本写死为 `40796`，与管理器版本一致），
-  打开 `CONFIG_KSU=y`（本版暂不开 SUSFS，后续可加）；
-- 用与 nightly 相同的 clang（r563880c / clang 21）编译 `Image`；
-- 校验构建内核的版本字符串与原厂一致后，用 magiskboot 换入原厂 boot.img 重打包。
+## 其它 ROM
 
-## 其它 ROM 怎么用
-
-其它基于同一内核（`android_kernel_xiaomi_sm8450`）的类原生 ROM（如 EvolutionX、LMODroid），只要：
-
-- `rom_preset` 选 `custom`，把 `rom_url` 换成对应 ROM 包的直链；
-- 把 `kernel_commit` 换成该 ROM 实际使用的内核 commit（可在 ROM 内核的
-  `uname -r` / vermagic 里看到 `-g<12位commit>`）；
-
-就能编出匹配该 ROM 的 KSU 内核。GKI 内核（6.1/6.6）的设备请勿使用本 workflow。
+同一内核（`android_kernel_xiaomi_sm8450`）的类原生 ROM：`rom_preset=custom` + `rom_url` 直链 +
+`kernel_commit` 换成该 ROM 实际 commit（`uname -r` 里 `-g<sha>`）。GKI 设备勿用本 workflow。
 
 ## 注意
 
-- 刷机前请先备份原厂 boot：`fastboot getvar current-slot` 后
-  `fastboot flash boot_<a/b> 原厂boot.img` 可恢复。
-- 默认预设 `suki-susfs` 已开启 SUSFS（root 隐藏），刷入后管理器显示驱动 40796。
+- 刷前备份原厂 boot（产物里有 `rom_out/boot.img`）。
+- 默认预设 `suki-susfs` 已开 SUSFS；刷后管理器显示驱动 40796。
