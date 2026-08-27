@@ -1,3 +1,5 @@
+1ab5819 feat: 新增 ReSukiSU 支持（root_impl=resuki，非 GKI 自动 Manual/SUSFS Inline 钩子，不强制版本号）
+3669122 docs: 补记 eaafbf5
 eaafbf5 feat: 新增 DerpFest-16.2 cupid 预设（仓库内 stock_boot boot.img.gz，免 ROM 直链）
 a47859d docs: 本地状态更新至 AviumUI-16.2.1（已刷入验证成功）
 339e806 docs: 补记 c62bbcf
