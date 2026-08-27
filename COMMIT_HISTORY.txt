@@ -1,3 +1,5 @@
+0610f75 refactor: 删除无效的旧 GKI build.yml；workflow 输入改为 ROM+配置预设两个下拉框（preset 自动填充技术参数）
+fd26346 docs: 补记 1ab5819
 1ab5819 feat: 新增 ReSukiSU 支持（root_impl=resuki，非 GKI 自动 Manual/SUSFS Inline 钩子，不强制版本号）
 3669122 docs: 补记 eaafbf5
 eaafbf5 feat: 新增 DerpFest-16.2 cupid 预设（仓库内 stock_boot boot.img.gz，免 ROM 直链）
