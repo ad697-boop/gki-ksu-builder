@@ -28,15 +28,21 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
 
 ## 使用步骤
 
-1. 进入仓库 Actions 页，手动运行 **Build SukiSU kernel (SM8450 cupid / lineage-23.2 & AviumUI)**。
-2. 选择 ROM 预设 `rom_preset`：
+1. 进入仓库 Actions 页，手动运行 **Build SukiSU/ReSukiSU kernel (Xiaomi 12 cupid)**。
+2. 只需选两个下拉框：
+   - **① `rom_preset`**（选 ROM）：
    - `lineage-23.2`（默认）：`lineage-23.2-20260820-nightly-cupid-signed`（Princeton 镜像）；
    - `aviumui-16.2.1`：`AviumUI-16.2.1-cupid-20260716-Official-GMS.zip`（官方 SourceForge 直链）；
    - `derpfest-16.2`：`DerpFest-v16.2-20260723-cupid-Official-Stable`（官方托管 OneDrive 无匿名直链，
      直接使用仓库内 `stock_boot/derpfest-16.2/boot.img.gz`，无需外链；也可手动填 `rom_url` 覆盖）；
    - `custom`：自己填 `rom_url` 直链（同一内核的其它类原生 ROM 也可用）。
-   两个预设共用一个内核 commit（`e682ed2de56f`），构建内核配置从各自 boot.img 提取，完全匹配各自的 ramdisk。
-   其它参数：
+   - **② `preset`**（选配置，自动填充技术参数）：
+     - `suki-susfs`（默认，推荐）：SukiSU v4.1.3 + SUSFS 全开 + 驱动 40796 + ReKernel-X；
+     - `suki-stable`：SukiSU v4.1.3 基础版（无 SUSFS）；
+     - `resuki-susfs`：ReSukiSU main + SUSFS（多管理器兼容，版本号自动）；
+     - `custom`：高级，手动配置下面所有参数。
+3. 两个 ROM 预设共用一个内核 commit（`e682ed2de56f`），构建内核配置从各自 boot.img 提取，完全匹配各自的 ramdisk。
+   以下参数平时不用动，仅 `preset=custom` 时才需要理解：
    - `rom_url`：仅 `rom_preset=custom` 时生效（预设会自动覆盖该值）；
    - `root_impl`：Root 实现，默认 `sukisu`（SukiSU-Ultra）；选 `resuki` 用 ReSukiSU
      （SukiSU-Ultra 的稳定分支，多管理器兼容，构建更容易）。
@@ -50,9 +56,9 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
      匹配本内核的模块 zip（官方预编译 .ko 的 vermagic 与本机不匹配，刷入无效，必须重新编译）。
    - `susfs`：默认 `no`；选 `yes` 时自动使用 SukiSU `builtin` 分支（LSM hook，自带 SUSFS 驱动代码），
      并从 susfs4ksu 的 `gki-android12-5.10` 分支打 SUSFS 内核补丁、开启 `CONFIG_KSU_SUSFS`。
-3. 等构建完成（内核 thin LTO + 8G swap，约 40-90 分钟），下载产物
+4. 等构建完成（内核 thin LTO + 8G swap，约 40-90 分钟），下载产物
    `boot-sukiSU-<rom预设>-5.10.256-gki-ge682ed2de56f`（如 `boot-sukiSU-aviumui-16.2.1-...`）。
-4. 刷入：
+5. 刷入：
    ```bash
    fastboot flash boot boot-sukiSU-<rom预设>-5.10.256-gki-ge682ed2de56f.img
    fastboot reboot
@@ -90,7 +96,6 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
 
 ## 注意
 
-- 旧 workflow `build.yml`（GKI 方案）已被证明在这台设备上无效（刷入无限重启），请勿再使用。
 - 刷机前请先备份原厂 boot：`fastboot getvar current-slot` 后
   `fastboot flash boot_<a/b> 原厂boot.img` 可恢复。
-- 本 workflow 默认不开 SUSFS（隐藏 root 需要另外给内核打 susfs 补丁），先保证 root 可用。
+- 默认预设 `suki-susfs` 已开启 SUSFS（root 隐藏），刷入后管理器显示驱动 40796。
