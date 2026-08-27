@@ -21,6 +21,7 @@
    - `custom`：自己填 `rom_url`（同一内核的其它 ROM 也可用）
    其它参数：
    - `rom_url`：仅 custom 时生效（预设会覆盖它）
+   - `root_impl`：`sukisu`（默认，SukiSU-Ultra）/ `resuki`（ReSukiSU，SukiSU 稳定分支，多管理器兼容）
    - `kernel_commit`：`e682ed2de56fd2841ef35741c4d0f03599ffd561`（lineage-23.2 分支，即该 nightly 用的 commit）
    - `ksu_ref`：SukiSU 分支/tag（默认 `v4.1.3`）
    - `ksu_version`：驱动版本号（默认 `40796`，与 v4.1.3 管理器一致）

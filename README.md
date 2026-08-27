@@ -38,6 +38,11 @@ cupid 的所有类原生 ROM（LineageOS/LMODroid 等）用的都是**高通 OSS
    两个预设共用一个内核 commit（`e682ed2de56f`），构建内核配置从各自 boot.img 提取，完全匹配各自的 ramdisk。
    其它参数：
    - `rom_url`：仅 `rom_preset=custom` 时生效（预设会自动覆盖该值）；
+   - `root_impl`：Root 实现，默认 `sukisu`（SukiSU-Ultra）；选 `resuki` 用 ReSukiSU
+     （SukiSU-Ultra 的稳定分支，多管理器兼容，构建更容易）。
+     ReSukiSU 模式：`susfs=yes` 时自动选 SUSFS Inline Hook + susfs4ksu 内核补丁；
+     `susfs=no` 时选 Manual Hook（非 GKI 用，Tracepoint 只支持 GKI2）。
+     ReSukiSU 版本号用它自带的公式（30000+commits+700），不强制 ksu_version。
    - `kernel_commit`：内核源码 commit（默认 `e682ed2de56f`，即该 nightly 实际使用的 commit）；
    - `ksu_ref`：SukiSU 分支/tag（默认 `v4.1.3` 稳定版；`main` 为最新开发版）。
    - `ksu_version`：强制内核驱动版本号（默认 `40796`，与 v4.1.3 管理器一致；留空则按 SukiSU 源码自动计算）。
